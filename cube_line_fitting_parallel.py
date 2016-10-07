@@ -148,13 +148,16 @@ def pix_fit(i,j):
 	spectra = cube[:,i,j]
 	rms = rms_cube[i,j]
 	err1 = np.zeros(shape[0])+rms
-	coeffs, covar_mat = curve_fit(p_eval2, xdata=spectra_x_axis_kms, ydata=spectra, p0=p3, sigma=err1)
 	noise=np.random.uniform(-1.*rms,rms,len(spectra_x_axis_kms))
-	noisy_gauss = np.array(p_eval3(spectra_x_axis_kms,coeffs[0], coeffs[1], coeffs[2], coeffs[3]))+noise
+	try:
+		coeffs, covar_mat = curve_fit(p_eval2, xdata=spectra_x_axis_kms, ydata=spectra, p0=p3, sigma=err1, maxfev=250)
+		noisy_gauss = np.array(p_eval3(spectra_x_axis_kms,coeffs[0], coeffs[1], coeffs[2], coeffs[3]))+noise
+	except RuntimeError:
+		noisy_gauss = nan_array
 	return i,j,noisy_gauss
 
 # Parallel computation:
-nproc = 3  	# maximum number of simultaneous processes desired
+nproc = 14  	# maximum number of simultaneous processes desired
 queue = pprocess.Queue(limit=nproc)
 calc = queue.manage(pprocess.MakeParallel(pix_fit))
 #results = pprocess.Map(limit=nproc, reuse=1)
@@ -168,7 +171,7 @@ for i,j,result in queue:
 	counter+=1
 	print str(counter) + ' of ' + str(pixels) + ' pixels completed'
 print "%f s for parallel computation." % (time.time() - tic)
-fits.writeto('gauss_cube.fits', cube_gauss,header=header,clobber=True)
+fits.writeto('gauss_cube.fits', cube_gauss,clobber=True)
 
 #counter=0
 #tic=time.time()
