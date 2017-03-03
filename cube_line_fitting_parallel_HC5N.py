@@ -18,7 +18,7 @@ mol = 'HC5N'
 # Observed Region
 region = 'Cepheus_L1251'
 
-SN_thresh = 3.0
+SN_thresh = 10.0
 
 ckms=2.99792458*10**5
 
@@ -38,6 +38,8 @@ rest_freq = header['RESTFRQ'] #transition frequency of given tracer (in 1/s)
 param_cube = fits.getdata(direct + region + '_' + mol + '_base_DR2_rms.fits')
 param_cube = param_cube.reshape((1,) + param_cube.shape)
 param_cube = np.concatenate((param_cube, param_cube, param_cube, param_cube, param_cube, param_cube, param_cube, param_cube), axis=0)
+
+param_header = fits.getheader(direct + region + '_' + mol + '_base_DR2.fits')
 
 def p_eval3(x, TaTau, Vlsr, FWHM, tau_main):
 
@@ -66,6 +68,9 @@ spectra_x_axis_start = freq_i-(freq_step*freq_ref)
 spectra_x_axis_end = freq_i+(freq_step*(shape[0]-freq_ref))
 spectra_x_axis = np.linspace(spectra_x_axis_start, spectra_x_axis_end, num=shape[0])
 spectra_x_axis_kms = ckms*(1.-(spectra_x_axis/rest_freq))
+
+#print spectra_x_axis_kms[freq_ref-1]
+#print ckms*(1.-(freq_i/rest_freq))
 
 nan_array=np.empty(shape[0])
 nan_array[:] = np.NAN
@@ -119,8 +124,27 @@ for i,j,result,parameters in queue:
 	print str(counter) + ' of ' + str(pixels) + ' pixels completed'
 print "%f s for parallel computation." % (time.time() - tic)
 
-fits.writeto(direct + 'gauss_cube_' + mol + '.fits', cube_gauss,clobber=True)
-fits.writeto(direct + 'param_cube_' + mol + '.fits', param_cube,clobber=True)
+header['CUNIT3'] = 'km/s'
+header['CTYPE3'] = 'Vlsr'
+header['CDELT3'] = abs(spectra_x_axis_kms[freq_ref-1]) - abs(spectra_x_axis_kms[freq_ref-2])
+header['CRVAL3'] = spectra_x_axis_kms[freq_ref-1]
+
+param_header['NAXIS3'] = len(nan_array2)
+param_header['WCSAXES'] = 3
+param_header['CRPIX3'] = 1
+param_header['CDELT3'] = 1
+param_header['CRVAL3'] = 0
+param_header['PLANE1'] = 'TaTau'
+param_header['PLANE2'] = 'VLSR'
+param_header['PLANE3'] = 'FWHM'
+param_header['PLANE4'] = 'tau_main'
+param_header['PLANE5'] = 'TaTau_err'
+param_header['PLANE6'] = 'VLSR_err'
+param_header['PLANE7'] = 'FWHM_err'
+param_header['PLANE8'] = 'tau_main_err'
+
+fits.writeto(direct + 'gauss_cube_' + mol + '.fits', cube_gauss, header=header, clobber=True)
+fits.writeto(direct + 'param_cube_' + mol + '.fits', param_cube, header=param_header, clobber=True)
 
 #counter=0
 #tic=time.time()
